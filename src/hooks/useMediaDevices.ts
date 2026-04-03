@@ -167,6 +167,7 @@ export function useMediaDevices(): UseMediaDevicesReturn {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     enumerateDevices();
     navigator.mediaDevices.addEventListener('devicechange', enumerateDevices);
     return () => {

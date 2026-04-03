@@ -15,7 +15,7 @@ Güncel Sistem Durumu bağlamı: ${context || 'Sistemler normal.'}
     const isGoogleKey = apiKey.startsWith("AIza");
     
     if (isGoogleKey) {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -29,13 +29,15 @@ Güncel Sistem Durumu bağlamı: ${context || 'Sistemler normal.'}
           ],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 256,
+            maxOutputTokens: 512,
           }
         }),
       });
 
       if (!response.ok) {
-          throw new Error("HTTP error " + response.status);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Google API Error:", response.status, errorData);
+          throw new Error(`Google API Error ${response.status}`);
       }
 
       const data = await response.json();
@@ -43,12 +45,14 @@ Güncel Sistem Durumu bağlamı: ${context || 'Sistemler normal.'}
         return data.candidates[0].content.parts[0].text.trim();
       }
     } else {
-      // Fallback for OpenRouter or other OpenAI compliant endpoints (if user provided an sk- key)
+      // Fallback for OpenRouter (OpenAI compliant)
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin, // Required by some OpenRouter configurations
+          "X-Title": "Pulsar-X Command Center",
         },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
@@ -57,12 +61,14 @@ Güncel Sistem Durumu bağlamı: ${context || 'Sistemler normal.'}
             { role: "user", content: prompt }
           ],
           temperature: 0.7,
-          max_tokens: 256,
+          max_tokens: 512,
         }),
       });
 
       if (!response.ok) {
-          throw new Error("HTTP error " + response.status);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("OpenRouter API Error:", response.status, errorData);
+          throw new Error(`OpenRouter API Error ${response.status}`);
       }
 
       const data = await response.json();
@@ -71,9 +77,9 @@ Güncel Sistem Durumu bağlamı: ${context || 'Sistemler normal.'}
       }
     }
     
-    return "Sorgunuzu işleyemedim efendim.";
+    return "Sorgunuzu işleyemedim efendim. Veritabanı yanıt vermedi.";
   } catch (error) {
-    console.error("Pulsar AI Error:", error);
-    return "Dış ağ bağlantısında bir hata oluştu efendim.";
+    console.error("Pulsar AI Global Error:", error);
+    return `Sistem bağlantısında bir aksaklık var efendim. (Hata: ${error instanceof Error ? error.message : 'Bilinmeyen Hata'})`;
   }
 };

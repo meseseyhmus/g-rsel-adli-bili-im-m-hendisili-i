@@ -101,6 +101,84 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
   const micDeviceIdRef = useRef(micDeviceId);
   const collectedRef = useRef(''); // PTT sırasında biriken metin
 
+  // ── UI Sound Effects (Cyber Style) ──────────────────────────
+  const playUISound = useCallback((type: 'start' | 'stop' | 'success' | 'processing' | 'error') => {
+    if (isSilentMode) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+      masterGain.gain.setValueAtTime(0, ctx.currentTime);
+      masterGain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+
+      if (type === 'start') {
+        // High-pitched "listen" beep
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+        osc.connect(masterGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+        masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      } else if (type === 'stop') {
+        // Lower-pitched "stop" blip
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+        osc.connect(masterGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+        masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      } else if (type === 'processing') {
+        // Subtle "thinking" pulse
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.connect(masterGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+        masterGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.1);
+        masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      } else if (type === 'success') {
+        // Affirmative double beep
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1100, ctx.currentTime);
+        osc.connect(masterGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+        masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        
+        ctx.onstatechange = () => { if (ctx.state === 'closed') return; };
+        setTimeout(() => {
+          if (ctx.state === 'closed') return;
+          const osc2 = ctx.createOscillator();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1320, ctx.currentTime);
+          osc2.connect(masterGain);
+          osc2.start();
+          osc2.stop(ctx.currentTime + 0.1);
+        }, 100);
+      } else if (type === 'error') {
+        // Error buzz
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, ctx.currentTime);
+        osc.connect(masterGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+        masterGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.05);
+        masterGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      }
+
+      setTimeout(() => ctx.close().catch(() => {}), 1000);
+    } catch (e) {
+      console.error('Sound play error:', e);
+    }
+  }, [isSilentMode]);
+
   useEffect(() => { onEventHandledRef.current = onEventHandled; }, [onEventHandled]);
   useEffect(() => { micDeviceIdRef.current = micDeviceId; }, [micDeviceId]);
 
@@ -184,6 +262,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
     if (!rawTranscript.trim()) return;
     setTranscript(rawTranscript);
     setStatus('processing');
+    playUISound('processing');
     const score = getTrustScore?.() ?? 96;
     let cmd = rawTranscript.toLowerCase();
     WAKE_WORDS.forEach(w => { cmd = cmd.replace(w, '').trim(); });
@@ -208,7 +287,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
         try {
           await axios.post('http://localhost:8000/api/attack/start', { attack_name: 'jamming' });
           speak(response, () => onTriggerJammingTest?.());
-        } catch (err) {
+        } catch {
           response = 'Jamming başlatılamadı efendim. Backend bağlantısını kontrol edin.';
           speak(response);
         }
@@ -219,7 +298,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
         try {
           await axios.post('http://localhost:8000/api/attack/start', { attack_name: 'spoofing' });
           speak(response, () => onTriggerJammingTest?.());
-        } catch (err) {
+        } catch {
           response = 'Spoofing testi başlatılamadı efendim. Backend bağlantısını kontrol edin.';
           speak(response);
         }
@@ -230,7 +309,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
         try {
           await axios.post('http://localhost:8000/api/attack/stop', { attack_name: 'all' });
           speak(response);
-        } catch (err) {
+        } catch {
           response = 'Saldırı durdurulamadı efendim. Backend bağlantısını kontrol edin.';
           speak(response);
         }
@@ -315,6 +394,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
     rec.onstart = () => {
       console.log('[PULSAR SR] 🎙 Recognition başladı — konuşabilirsiniz');
       setStatus('listening');
+      playUISound('start');
       // Başladığında düşük seviye animasyonu
       setMicLevel(5);
     };
@@ -371,6 +451,7 @@ export function useVoiceCommands(options: UseVoiceCommandsOptions = {}) {
 
     rec.onend = () => {
       console.log('[PULSAR SR] Bitti. Toplanan:', collectedRef.current.trim());
+      playUISound('stop');
       // Eğer hâlâ recording state'indeyse ve collected boşsa → no-speech, yeniden başlat
       // Eğer kullanıcı butona basmadan ended → yeniden başlatma, sadece dur
       setIsRecording(false);

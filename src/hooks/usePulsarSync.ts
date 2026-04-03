@@ -81,6 +81,7 @@ export function usePulsarSync(): UsePulsarSyncReturn {
           reconnectAttemptsRef.current++;
           console.log(`[PULSAR SYNC] Yeniden bağlanma denemesi ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
           reconnectTimeoutRef.current = setTimeout(() => {
+            // eslint-disable-next-line react-hooks/immutability
             connect();
           }, RECONNECT_DELAY);
         }
