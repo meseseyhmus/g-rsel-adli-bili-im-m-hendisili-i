@@ -24,4 +24,4 @@ Sistem multimodal veri girişini destekler:
 Pulsar AI, analiz sonuçlarını yorumlayan ve sistem hazır olduğunda (SİSTEM HAZIR) kullanıcıya hedef veriler üzerinden yol gösteren merkezi zekadır.
 
 ---
-*Hazırlayan: Antigravity AI Assistant*
+
