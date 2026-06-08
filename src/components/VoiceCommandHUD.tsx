@@ -12,6 +12,7 @@ interface VoiceCommandHUDProps {
   permissionDenied: boolean;
   micAvailable: boolean;
   onToggle: () => void;
+  onStop?: () => void;
   onSilentToggle: () => void;
 }
 
@@ -92,11 +93,33 @@ export default function VoiceCommandHUD({
   permissionDenied,
   micAvailable,
   onToggle,
+  onStop,
   onSilentToggle,
 }: VoiceCommandHUDProps) {
   const [showCommands, setShowCommands] = useState(false);
   const [eventLog, setEventLog] = useState<VoiceCommandEvent[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
+
+  // Durma butonu handler - konuşma sırasında butona basıldığında çalışır
+  const handleStopClick = () => {
+    if (status === 'listening' || status === 'processing' || status === 'speaking') {
+      onStop?.() || onToggle();
+    } else {
+      onToggle();
+    }
+  };
+
+  // ESC tuşu ile durma
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (status === 'listening' || status === 'processing' || status === 'speaking')) {
+        e.preventDefault();
+        onStop?.() || onToggle();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status, onStop, onToggle]);
 
   const isActive = status !== 'idle' && status !== 'standby';
   const statusInfo = STATUS_LABELS[status] ?? STATUS_LABELS.idle;
@@ -175,9 +198,9 @@ export default function VoiceCommandHUD({
 
           {/* Main mic button */}
           <button
-            onClick={onToggle}
+            onClick={handleStopClick}
             className={`voice-mic-btn ${isActive ? 'voice-mic-active' : 'voice-mic-idle'}`}
-            title={isActive ? 'Durdur' : 'Başlat'}
+            title={isActive ? 'Durdur (ESC)' : 'Başlat'}
           >
             {isActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
           </button>

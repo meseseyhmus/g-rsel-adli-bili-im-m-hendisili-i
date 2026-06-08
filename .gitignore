@@ -20,3 +20,26 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/uploads/
+backend/*.pyc
+__pycache__/
+*.pyc
+
+# Test files
+backend/test*.jpg
+backend/test*.py
+backend/test_files/
+
+# Misc project files
+error.txt
+free_vision.txt
+out.txt
+txt
+kitapyurdu_scraper.py
+test_or.py
+prd.md
+PULSAR-X_20Sayfa_Sunum_Raporu.md

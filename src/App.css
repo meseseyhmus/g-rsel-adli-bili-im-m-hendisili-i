@@ -370,6 +370,20 @@
   color: var(--pulsar-cyan);
   box-shadow: 0 0 15px rgba(0, 212, 255, 0.35);
   animation: mic-btn-pulse 1.5s ease-in-out infinite;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.voice-mic-active:hover {
+  border-color: rgba(0, 212, 255, 1);
+  background: rgba(0, 212, 255, 0.2);
+  box-shadow: 0 0 25px rgba(0, 212, 255, 0.6);
+  transform: scale(1.05);
+}
+
+.voice-mic-active:active {
+  transform: scale(0.95);
+  box-shadow: 0 0 35px rgba(0, 212, 255, 0.8);
 }
 
 @keyframes mic-btn-pulse {
