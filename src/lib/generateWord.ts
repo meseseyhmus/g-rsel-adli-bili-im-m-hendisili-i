@@ -12,7 +12,6 @@ import {
   TextRun,
   HeadingLevel,
   AlignmentType,
-  NumberFormat,
   LevelFormat,
   convertInchesToTwip,
   Table,
@@ -23,6 +22,7 @@ import {
   ImageRun,
   PageBreak,
 } from 'docx';
+import type { ISectionOptions } from 'docx';
 import { saveAs } from 'file-saver';
 
 // ──────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ const REFERENCES = [
 // ──────────────────────────────────────────────────────────────
 // Yardımcı: Başlık paragrafı
 // ──────────────────────────────────────────────────────────────
-function heading(text: string, level: HeadingLevel = HeadingLevel.HEADING_1): Paragraph {
+function heading(text: string, level: typeof HeadingLevel[keyof typeof HeadingLevel] = HeadingLevel.HEADING_1): Paragraph {
   return new Paragraph({
     text,
     heading: level,
@@ -135,6 +135,7 @@ function base64ToUint8Array(b64: string): Uint8Array {
 
 // ──────────────────────────────────────────────────────────────
 // WORD BELGESİ OLUŞTUR
+// Table ve Paragraph birlikte ISectionOptions['children'] tipinde tutulur
 // ──────────────────────────────────────────────────────────────
 export async function generateWordReport(data: WordReportData): Promise<void> {
   const score = data.manipulationScore ?? 0;
@@ -142,7 +143,8 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
     ? score > 60 ? 'KRİTİK — Manipülasyon Tespit Edildi' : 'ŞÜPHELİ — İnceleme Gerekiyor'
     : 'TEMİZ — Özgünlük Doğrulandı';
 
-  const sections: Paragraph[] = [];
+  // Hem Paragraph hem Table kabul eden dizi
+  const sections: ISectionOptions['children'] = [];
 
   // ── KAPAK / ÖZET ──────────────────────────────────────────
   sections.push(
@@ -201,7 +203,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
   sections.push(heading('2.2. Kullanılan Yöntemler', HeadingLevel.HEADING_2));
   sections.push(
     labelValue('Yöntem 1 — ELA (Error Level Analysis)', 'JPEG sıkıştırma hatası farklılıklarını piksel düzeyinde analiz eder. Manipüle bölgeler yeniden sıkıştırmaya farklı tepki verir ve ELA haritasında parlak alanlar olarak görünür.'),
-    labelValue('Yöntem 2 — DCT Blok Analizi', 'Görüntü 8×8 bloklara bölünerek her bloğun frekans dağılımı incelenir. Birden fazla kaynaktan gelen piksel grupları istatistiksel anomali oluşturur.'),
+    labelValue('Yöntem 2 — DCT Blok Analizi', 'Görüntü 8x8 bloklara bölünerek her bloğun frekans dağılımı incelenir. Birden fazla kaynaktan gelen piksel grupları istatistiksel anomali oluşturur.'),
     labelValue('Yöntem 3 — Derin Öğrenme (CNN / ResNet-50 / EfficientNet)', 'Önceden eğitilmiş ağlar, CASIA 2.0 veri kümesiyle ince ayar yapılarak manipülasyon örüntülerini öğrenir.'),
   );
 
@@ -214,7 +216,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
     new Paragraph({
       children: [
         new TextRun({
-          text: `  ▶ KARAR: ${verdict}  `,
+          text: `  KARAR: ${verdict}  `,
           bold: true,
           size: 26,
           color: data.isManipulated ? 'CC0000' : '007700',
@@ -269,7 +271,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
       rows: [
         new TableRow({
           tableHeader: true,
-          children: ['PARAMETRE', 'DEĞER'].map(h =>
+          children: ['PARAMETRE', 'DEGER'].map(h =>
             new TableCell({
               children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 22 })] })],
               shading: { fill: '003399' },
@@ -291,7 +293,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
 
   // Hash bilgileri
   if (data.hashes) {
-    sections.push(heading('3.1. Kriptografik Hash Değerleri', HeadingLevel.HEADING_2));
+    sections.push(heading('3.1. Kriptografik Hash Degerleri', HeadingLevel.HEADING_2));
     sections.push(
       labelValue('MD5', data.hashes.md5),
       labelValue('SHA-1', data.hashes.sha1),
@@ -300,37 +302,37 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
   }
 
   // Teknik Yorumlama
-  sections.push(heading('3.2. Teknik Değerlendirme', HeadingLevel.HEADING_2));
+  sections.push(heading('3.2. Teknik Degerlendirme', HeadingLevel.HEADING_2));
   const technicalSummary = data.isManipulated
     ? (score > 60
-      ? `İncelenen görsel üzerinde uygulanan ELA ve DCT analizleri KRİTİK düzeyde tutarsızlık ortaya koymaktadır. ` +
-        `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} adet 8×8 DCT bloğu incelendiğinde yüksek frekanslı istatistiksel anomaliler saptanmıştır. ` +
-        `ELA yoğunluğu ${(data.elaMeanIntensity ?? 0).toFixed(4)} ile eşik değerin üzerindedir. ` +
-        `Görsel hukuki işlemlerde orijinal belge niteliğini yitirmiş kabul edilmelidir.`
-      : `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} DCT bloğu analiz edilmiş; bir bölümünde yerel kalite farklılıkları tespit edilmiştir. ` +
-        `Risk skoru %${score.toFixed(1)} olup ek adli inceleme önerilmektedir.`)
-    : `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} adet 8×8 DCT bloğu ve üç JPEG kalite seviyesinde yürütülen ELA analizi sonucunda ` +
-      `istatistiksel olarak anlamlı manipülasyon izi saptanamamıştır. ELA ortalama yoğunluğu düşük (${(data.elaMeanIntensity ?? 0).toFixed(4)}) seyretmektedir. ` +
-      `Bu görsel OİRJİNAL olarak değerlendirilmektedir.`;
+      ? `Incelenen gorsel uzerinde uygulanan ELA ve DCT analizleri KRITIK duzeyde tutarsizlik ortaya koymaktadir. ` +
+        `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} adet 8x8 DCT bloku incelendiginde yuksek frekanslı istatistiksel anomaliler saptanmistir. ` +
+        `ELA yogunlugu ${(data.elaMeanIntensity ?? 0).toFixed(4)} ile esik degerinin uzerindedir. ` +
+        `Gorsel hukuki islemlerde orijinal belge niteligi yitirmis kabul edilmelidir.`
+      : `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} DCT bloku analiz edilmis; bir bolumunde yerel kalite farkliliklari tespit edilmistir. ` +
+        `Risk skoru %${score.toFixed(1)} olup ek adli inceleme onerilmektedir.`)
+    : `${(data.dctBlocksAnalyzed ?? 0).toLocaleString('tr-TR')} adet 8x8 DCT bloku ve uc JPEG kalite seviyesinde yurutulen ELA analizi sonucunda ` +
+      `istatistiksel olarak anlamli manipulasyon izi saptanamamistir. ELA ortalama yogunlugu dusuk (${(data.elaMeanIntensity ?? 0).toFixed(4)}) seyretmektedir. ` +
+      `Bu gorsel ORIJINAL olarak degerlendirilmektedir.`;
 
   sections.push(body(technicalSummary));
 
   // AI Raporu
   if (data.aiProofReport) {
-    sections.push(heading('3.3. Yapay Zeka Uzman Görüşü (P.U.L.S.A.R. Vision)', HeadingLevel.HEADING_2));
+    sections.push(heading('3.3. Yapay Zeka Uzman Gorusu (P.U.L.S.A.R. Vision)', HeadingLevel.HEADING_2));
     sections.push(body(data.aiProofReport));
   }
 
   // Görsel ekleme (orijinal, ELA, ısı haritası)
   const imageEntries = [
-    { b64: data.originalBase64, label: 'Şekil 1: Orijinal Görsel' },
-    { b64: data.elaBase64, label: 'Şekil 2: ELA (Hata Düzeyi Analizi) Haritası' },
-    { b64: data.heatmapBase64, label: 'Şekil 3: DCT Isı Haritası' },
+    { b64: data.originalBase64, label: 'Sekil 1: Orijinal Gorsel' },
+    { b64: data.elaBase64, label: 'Sekil 2: ELA (Hata Duzeyi Analizi) Haritasi' },
+    { b64: data.heatmapBase64, label: 'Sekil 3: DCT Isi Haritasi' },
   ];
 
   const hasImages = imageEntries.some(e => !!e.b64);
   if (hasImages) {
-    sections.push(heading('3.4. Görsel Kanıtlar', HeadingLevel.HEADING_2));
+    sections.push(heading('3.4. Gorsel Kanitlar', HeadingLevel.HEADING_2));
     for (const entry of imageEntries) {
       if (!entry.b64) continue;
       try {
@@ -358,7 +360,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
 
   // ── KAYNAKÇA ──────────────────────────────────────────────
   sections.push(new Paragraph({ children: [new PageBreak()] }));
-  sections.push(heading('Kaynakça'));
+  sections.push(heading('Kaynakca'));
   sections.push(
     new Paragraph({
       children: [
@@ -392,7 +394,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Hukuki Uyarı: Bu rapor P.U.L.S.A.R. AI tarafından otomatik üretilmiştir. Bulgular algoritmik analiz sonuçları olup tek başına hukuki delil olarak kullanılamaz.',
+          text: 'Hukuki Uyari: Bu rapor P.U.L.S.A.R. AI tarafından otomatik uretilmistir. Bulgular algoritmik analiz sonuclari olup tek basina hukuki delil olarak kullanilamaz.',
           italics: true,
           size: 18,
           color: '888888',
@@ -406,7 +408,7 @@ export async function generateWordReport(data: WordReportData): Promise<void> {
   // ── BELGE OLUŞTUR ─────────────────────────────────────────
   const doc = new Document({
     creator: 'P.U.L.S.A.R. AI',
-    title: 'Görsel Adli Bilişim Raporu',
+    title: 'Gorsel Adli Bilisim Raporu',
     description: 'Derin Sahte Tespit Analizi',
     numbering: {
       config: [

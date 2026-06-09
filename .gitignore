@@ -43,3 +43,10 @@ kitapyurdu_scraper.py
 test_or.py
 prd.md
 PULSAR-X_20Sayfa_Sunum_Raporu.md
+
+.vercel
+
+# Scratch & Debug
+scratch/
+debug_page.py
+~$*
